@@ -8,5 +8,5 @@ python-multipart==0.0.20
 pydantic-settings==2.6.1
 
 # sqlalchemy==2.0.36
-# asyncpg==0.30.0  # PostgreSQL 异步驱动
+# asyncpg==0.30.0
 # databases==0.9.0
