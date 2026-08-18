@@ -11,5 +11,5 @@ serve
 #2.git自动添加记录
 ---
 ```bash
-gitup $说明
+gitupate [<说明>]
 ```
