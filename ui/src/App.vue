@@ -4,8 +4,21 @@
     <button @click="fetchData">点我获取后端数据</button>
     <p>{{ message }}</p>
   </div>
+  <hr />
+  <div id="app">
+    <h1>我的 Vue Router 应用</h1>
+    <nav>
+      <RouterLink to="/">首页</RouterLink> |
+      <RouterLink to="/about">关于</RouterLink>
+    </nav>
+    <RouterView />
+  </div>
 </template>
 
+<style>
+#app { text-align: center; margin-top: 50px; }
+nav { margin-bottom: 20px; }
+</style>
 <script>
 export default {
   data() {
@@ -16,7 +29,7 @@ export default {
   methods: {
     async fetchData() {
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/test');
+        const res = await fetch('/api/test');
         const data = await res.json();
         this.message = data.data;
       } catch (e) {
