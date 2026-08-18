@@ -5,7 +5,7 @@
 #1.Python运行服务器
 ---
 ```bash
-serve
+pyserve
 ```
 
 #2.git自动添加记录
