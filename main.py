@@ -1,16 +1,23 @@
 import hashlib
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from passlib.context import CryptContext
-from database import get_db
+from database import get_db, engine, Base
+from contextlib import asynccontextmanager
 
 from models import User, RevokedToken
 from auth import create_access_token, get_current_user, verify_password, oauth2_scheme
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -43,7 +50,7 @@ async def read_users_me(current_user = Depends(get_current_user)):
     return current_user
 
 @app.post("/api/public/register")
-async def register(username: str, password: str, email: str = None, db: AsyncSession = Depends(get_db)):
+async def register(username: str = Form(...), password: str=Form(...), email: str = Form(None), db: AsyncSession = Depends(get_db)):
     existing_user = await db.execute(select(User).where(User.username == username))
     if existing_user.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="用户名已存在")
