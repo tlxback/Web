@@ -2,7 +2,8 @@ node_modules/
 __pycache__/
 *.pyc
 .env
-key.txt
+key*.txt
+logfile
 .DS_Store
 dist/
 dist-ssr/
