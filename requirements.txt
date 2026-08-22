@@ -1,6 +1,6 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.3
-sqlalchemy==2.0.52
+sqlalchemy==2.0.36
 asyncpg==0.31.0
 passlib[bcrypt]==1.7.4
 pyjwt[crypto]==2.13.0

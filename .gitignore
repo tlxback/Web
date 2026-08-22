@@ -8,3 +8,5 @@ logfile
 dist/
 dist-ssr/
 .vite/
+sql/
+venv/

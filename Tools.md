@@ -19,3 +19,10 @@ gitupate [<说明>]
 ```bash
 serve
 ```
+
+#4. Ubuntu工具
+---
+如果在Ubuntu打开，那么执行: 
+```bash
+source venv/bin/activate
+```

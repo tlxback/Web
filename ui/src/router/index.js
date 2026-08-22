@@ -1,10 +1,10 @@
 // src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../Home.vue'
+import LoginView from '../components/Login.vue'
 import AboutView from '../About.vue'
 
 const routes = [
-  { path: '/', component: HomeView },       // 访问 / 显示首页
+  { path: '/', component: LoginView },       // 根路由显示登录页
   { path: '/about', component: AboutView }  // 访问 /about 显示关于
 ]
 
