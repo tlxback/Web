@@ -1,0 +1,15 @@
+2026-08-24 13:04:56.455 CST [20545] LOG:  starting PostgreSQL 18.2 on aarch64-unknown-linux-android, compiled by Android (13989888, +pgo, +bolt, +lto, +mlgo, based on r563880c) clang version 21.0.0 (https://android.googlesource.com/toolchain/llvm-project 5e96669f06077099aa41290cdb4c5e6fa0f59349), 64-bit
+2026-08-24 13:04:56.456 CST [20545] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2026-08-24 13:04:56.459 CST [20545] LOG:  listening on Unix socket "/data/data/com.termux/files/usr/tmp/.s.PGSQL.5432"
+2026-08-24 13:04:56.469 CST [20553] LOG:  database system was shut down at 2026-08-24 13:04:43 CST
+2026-08-24 13:04:56.487 CST [20545] LOG:  database system is ready to accept connections
+2026-08-24 13:09:56.477 CST [20551] LOG:  checkpoint starting: time
+2026-08-24 13:10:00.757 CST [20551] LOG:  checkpoint complete: wrote 42 buffers (0.3%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=4.239 s, sync=0.016 s, total=4.281 s; sync files=11, longest=0.005 s, average=0.002 s; distance=317 kB, estimate=317 kB; lsn=0/17B3128, redo lsn=0/17B30D0
+2026-08-24 14:34:33.901 CST [29373] FATAL:  database "webdb" does not exist
+2026-08-24 14:36:50.043 CST [30812] FATAL:  database "u0_a322" does not exist
+2026-08-24 14:37:19.883 CST [31172] ERROR:  schema "public" already exists
+2026-08-24 14:37:19.883 CST [31172] STATEMENT:  CREATE SCHEMA public;
+2026-08-24 14:37:21.218 CST [31172] ERROR:  role "myuser" does not exist
+2026-08-24 14:37:21.218 CST [31172] STATEMENT:  GRANT ALL ON SCHEMA public TO myuser;
+2026-08-24 14:42:31.444 CST [20551] LOG:  checkpoint starting: time
+2026-08-24 14:50:00.494 CST [20551] LOG:  checkpoint complete: wrote 1901 buffers (11.6%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=448.932 s, sync=0.084 s, total=449.051 s; sync files=600, longest=0.009 s, average=0.001 s; distance=8737 kB, estimate=8737 kB; lsn=0/203B650, redo lsn=0/203B5C0
