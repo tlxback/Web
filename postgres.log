@@ -20,3 +20,15 @@
 2026-08-24 18:53:12.039 CST [20551] LOG:  checkpoint complete: wrote 955 buffers (5.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.055 s, sync=0.162 s, total=0.227 s; sync files=305, longest=0.006 s, average=0.001 s; distance=4370 kB, estimate=7514 kB; lsn=0/2481660, redo lsn=0/24815D0
 2026-08-24 18:58:11.131 CST [20551] LOG:  checkpoint starting: time
 2026-08-24 18:58:17.050 CST [20551] LOG:  checkpoint complete: wrote 58 buffers (0.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=5.871 s, sync=0.032 s, total=5.920 s; sync files=53, longest=0.003 s, average=0.001 s; distance=246 kB, estimate=6787 kB; lsn=0/24BF0F8, redo lsn=0/24BF068
+2026-08-24 19:16:29.355 CST [29822] LOG:  starting PostgreSQL 18.2 on aarch64-unknown-linux-android, compiled by Android (13989888, +pgo, +bolt, +lto, +mlgo, based on r563880c) clang version 21.0.0 (https://android.googlesource.com/toolchain/llvm-project 5e96669f06077099aa41290cdb4c5e6fa0f59349), 64-bit
+2026-08-24 19:16:29.357 CST [29822] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2026-08-24 19:16:29.359 CST [29822] LOG:  listening on Unix socket "/data/data/com.termux/files/usr/tmp/.s.PGSQL.5432"
+2026-08-24 19:16:29.368 CST [29855] LOG:  database system was interrupted; last known up at 2026-08-24 19:06:27 CST
+2026-08-24 19:16:30.032 CST [29855] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-08-24 19:16:30.037 CST [29855] LOG:  redo starts at 0/24C8C80
+2026-08-24 19:16:30.038 CST [29855] LOG:  invalid record length at 0/24C8D88: expected at least 24, got 0
+2026-08-24 19:16:30.038 CST [29855] LOG:  redo done at 0/24C8D50 system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+2026-08-24 19:16:30.050 CST [29848] LOG:  checkpoint starting: end-of-recovery immediate wait
+2026-08-24 19:16:30.061 CST [29848] LOG:  checkpoint complete: wrote 0 buffers (0.0%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.001 s, total=0.012 s; sync files=2, longest=0.001 s, average=0.001 s; distance=0 kB, estimate=0 kB; lsn=0/24C8D88, redo lsn=0/24C8D88
+2026-08-24 19:16:30.068 CST [29822] LOG:  database system is ready to accept connections
+2026-08-24 19:18:09.486 CST [30247] FATAL:  terminating connection due to unexpected postmaster exit
