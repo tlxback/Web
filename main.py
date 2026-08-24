@@ -65,8 +65,10 @@ async def register(username: str = Form(...), password: str=Form(...), email: st
     
     return {"status": True, "msg": "注册成功", "user_id": new_user.id}
 
+from fastapi.responses import JSONResponse
+
 @app.post("/api/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)): 
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(User).where(User.username == form_data.username)
     )
@@ -84,7 +86,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
     access_token=create_access_token(data={"sub": user.username})
     user.hashed_token=hashlib.sha256(access_token.encode()).hexdigest()
     await db.commit()
-    return {"access_token": access_token, "token_type":"bearer"}
+
+    # 返回 JSON 同时在 cookie 中设置 access_token，便于前端从 cookie 读取
+    resp = JSONResponse(content={"access_token": access_token, "token_type":"bearer"})
+    # 为了让前端 JS 能读取 cookie（按需），这里不设置 HttpOnly；如需更安全请改为 httponly=True 并使用后端会话校验
+    resp.set_cookie(key="access_token", value=access_token, httponly=False, samesite="lax")
+    return resp
 
 @app.post("/api/private/logout")
 async def logout(
