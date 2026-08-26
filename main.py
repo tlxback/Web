@@ -93,6 +93,20 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
     resp.set_cookie(key="access_token", value=access_token, httponly=False, samesite="lax")
     return resp
 
+@app.delete("/api/private/account")
+async def delete_account(
+    token: str = Depends(oauth2_scheme),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    db.add(RevokedToken(token_hash=hashlib.sha256(token.encode()).hexdigest()))
+    await db.delete(current_user)
+    await db.commit()
+
+    response = JSONResponse(content={"msg": "账号已注销"})
+    response.delete_cookie(key="access_token")
+    return response
+
 @app.post("/api/private/logout")
 async def logout(
     token: str = Depends(oauth2_scheme),
