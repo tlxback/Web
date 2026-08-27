@@ -9,11 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cap.js/widget": "^0.1.57",
     "vue": "^3.5.0",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.6.2",
     "vite": "^4.5.3"
+  },
+  "allowScripts": {
+    "esbuild@0.18.20": true
   }
 }
