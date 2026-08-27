@@ -1,14 +1,21 @@
 import hashlib
+import asyncio
+import hmac
+import os
+import secrets
+import smtplib
+from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
 from fastapi import FastAPI, Depends, HTTPException, status, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from passlib.context import CryptContext
 from database import get_db, engine, Base
 from contextlib import asynccontextmanager
 
-from models import User, RevokedToken
+from models import User, RevokedToken, EmailVerificationCode
 from auth import create_access_token, get_current_user, verify_password, oauth2_scheme
 
 @asynccontextmanager
@@ -20,6 +27,36 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+VERIFICATION_CODE_EXPIRE_MINUTES = 10
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+def _hash_verification_code(email: str, code: str) -> str:
+    secret = os.getenv("VERIFICATION_CODE_SECRET", "change-this-verification-secret")
+    return hmac.new(
+        secret.encode(), f"{email}:{code}".encode(), hashlib.sha256
+    ).hexdigest()
+
+def _send_verification_email(email: str, code: str) -> None:
+    smtp_user = os.getenv("SMTP_USER", "tlxback@sina.com")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    if not smtp_user or not smtp_password:
+        raise RuntimeError("SMTP_USER 和 SMTP_PASSWORD 未配置")
+
+    message = EmailMessage()
+    message["Subject"] = "注册验证码"
+    message["From"] = smtp_user
+    message["To"] = email
+    message.set_content(f"你的注册验证码是：{code}\n验证码有效期为 {VERIFICATION_CODE_EXPIRE_MINUTES} 分钟。")
+
+    with smtplib.SMTP_SSL(
+        os.getenv("SMTP_HOST", "smtp.sina.com"),
+        int(os.getenv("SMTP_PORT", "465")),
+        timeout=20,
+    ) as smtp:
+        smtp.login(smtp_user, smtp_password)
+        smtp.send_message(message)
 
 '''app.add_middleware(
     CORSMiddleware,
@@ -49,16 +86,76 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 async def read_users_me(current_user = Depends(get_current_user)):
     return current_user
 
+@app.post("/api/public/send-verification-code")
+async def send_verification_code(email: str = Form(...), db: AsyncSession = Depends(get_db)):
+    email = _normalize_email(email)
+    existing_user = await db.execute(select(User).where(User.email == email))
+    if existing_user.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="邮箱已被注册")
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    await db.execute(
+        delete(EmailVerificationCode).where(
+            EmailVerificationCode.email == email,
+            EmailVerificationCode.used.is_(False),
+        )
+    )
+    verification = EmailVerificationCode(
+        email=email,
+        code_hash=_hash_verification_code(email, code),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_CODE_EXPIRE_MINUTES),
+    )
+    db.add(verification)
+    await db.commit()
+
+    try:
+        await asyncio.to_thread(_send_verification_email, email, code)
+    except Exception as exc:
+        await db.delete(verification)
+        await db.commit()
+        raise HTTPException(status_code=503, detail="验证码邮件发送失败，请稍后重试") from exc
+
+    return {"status": True, "msg": "验证码已发送"}
+
 @app.post("/api/public/register")
-async def register(username: str = Form(...), password: str=Form(...), email: str = Form(None), db: AsyncSession = Depends(get_db)):
+async def register(
+    username: str = Form(...),
+    password: str = Form(...),
+    email: str = Form(...),
+    verification_code: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    email = _normalize_email(email)
     existing_user = await db.execute(select(User).where(User.username == username))
     if existing_user.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="用户名已存在")
-    
+
+    existing_email = await db.execute(select(User).where(User.email == email))
+    if existing_email.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="邮箱已被注册")
+
+    verification_result = await db.execute(
+        select(EmailVerificationCode)
+        .where(
+            EmailVerificationCode.email == email,
+            EmailVerificationCode.used.is_(False),
+        )
+        .order_by(EmailVerificationCode.created_at.desc())
+    )
+    verification = verification_result.scalars().first()
+    if (
+        verification is None
+        or verification.expires_at < datetime.now(timezone.utc)
+        or not hmac.compare_digest(
+            verification.code_hash,
+            _hash_verification_code(email, verification_code.strip()),
+        )
+    ):
+        raise HTTPException(status_code=400, detail="验证码无效或已过期")
+
+    verification.used = True
     hashed = pwd_context.hash(password)
-    
     new_user = User(username=username, hashed_password=hashed, email=email)
-    
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)

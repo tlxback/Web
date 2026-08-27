@@ -20,8 +20,18 @@
               </div>
 
               <div class="mb-3">
-                <label class="form-label">邮箱（可选）</label>
-                <input v-model="email" type="email" class="form-control" />
+                <label class="form-label">邮箱</label>
+                <div class="input-group">
+                  <input v-model="email" type="email" class="form-control" required />
+                  <button type="button" class="btn btn-outline-secondary" @click="sendCode" :disabled="sendingCode">
+                    {{ sendingCode ? '发送中...' : '发送验证码' }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">邮箱验证码</label>
+                <input v-model="verificationCode" class="form-control" inputmode="numeric" maxlength="6" required />
               </div>
 
               <button class="btn btn-success w-100" :disabled="loading">
@@ -48,10 +58,43 @@ import { useRouter } from 'vue-router'
 const username = ref('')
 const password = ref('')
 const email = ref('')
+const verificationCode = ref('')
 const loading = ref(false)
+const sendingCode = ref(false)
 const alert = ref('')
 const alertClass = ref('alert-danger')
 const router = useRouter()
+
+async function sendCode(){
+  if (!email.value) {
+    alertClass.value = 'alert-danger'
+    alert.value = '请先填写邮箱'
+    return
+  }
+  sendingCode.value = true
+  alert.value = ''
+  try {
+    const body = new URLSearchParams({ email: email.value })
+    const res = await fetch('/api/public/send-verification-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      alertClass.value = 'alert-danger'
+      alert.value = data.detail || '验证码发送失败'
+      return
+    }
+    alertClass.value = 'alert-success'
+    alert.value = '验证码已发送，请查收邮件'
+  } catch(e){
+    alertClass.value = 'alert-danger'
+    alert.value = '请求失败'
+  } finally {
+    sendingCode.value = false
+  }
+}
 
 async function onSubmit(){
   loading.value = true
@@ -60,7 +103,8 @@ async function onSubmit(){
     const body = new URLSearchParams()
     body.append('username', username.value)
     body.append('password', password.value)
-    if (email.value) body.append('email', email.value)
+    body.append('email', email.value)
+    body.append('verification_code', verificationCode.value)
 
     const res = await fetch('/api/public/register', {
       method: 'POST',
