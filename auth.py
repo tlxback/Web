@@ -62,5 +62,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     )
     
     user = result.scalar_one_or_none()
-    if user.username is None: raise credentials_exception
+    if user is None or user.username is None:
+        raise credentials_exception
     return user

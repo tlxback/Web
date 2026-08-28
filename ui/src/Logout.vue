@@ -24,9 +24,14 @@ function clearAuth() {
 }
 
 onMounted(async () => {
-  // attempt server-side logout if endpoint exists
+  const token = localStorage.getItem('access_token')
   try {
-    await fetch('/api/logout', { method: 'POST', credentials: 'include' })
+    if (token) {
+      await fetch('/api/private/logout', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token }
+      })
+    }
   } catch (e) {
     // ignore network errors
   }
