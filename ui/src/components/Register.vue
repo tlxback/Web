@@ -8,6 +8,8 @@
 
             <div v-if="alert" :class="'alert ' + alertClass" role="alert">{{ alert }}</div>
 
+            <cap-widget :data-cap-api-endpoint="capApiEndpoint" @solve="onSolve" @error="onError" required></cap-widget>
+
             <form @submit.prevent="onSubmit">
               <div class="mb-3">
                 <label class="form-label">用户名</label>
@@ -52,7 +54,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import '@cap.js/widget'
 import { useRouter } from 'vue-router'
 
 const username = ref('')
@@ -60,6 +63,8 @@ const password = ref('')
 const email = ref('')
 const verificationCode = ref('')
 const loading = ref(false)
+const captchaToken = ref('')
+const capApiEndpoint = '/api/cap/challenge'
 const sendingCode = ref(false)
 const alert = ref('')
 const alertClass = ref('alert-danger')
@@ -96,7 +101,11 @@ async function sendCode(){
   }
 }
 
+function onSolve(event){ captchaToken.value = event.detail.token }
+function onError(){ captchaToken.value = '' }
+
 async function onSubmit(){
+  if (!captchaToken.value) { alertClass.value = 'alert-danger'; alert.value = '请先完成人机验证'; return }
   loading.value = true
   alert.value = ''
   try {
@@ -105,6 +114,7 @@ async function onSubmit(){
     body.append('password', password.value)
     body.append('email', email.value)
     body.append('verification_code', verificationCode.value)
+    body.append('cap_token', captchaToken.value)
 
     const res = await fetch('/api/public/register', {
       method: 'POST',

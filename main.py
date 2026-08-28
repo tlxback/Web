@@ -7,6 +7,8 @@ import smtplib
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from fastapi import FastAPI, Depends, HTTPException, status, Form
+from pydantic import BaseModel
+from capjs_server import CapServer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +27,23 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+cap = CapServer(secret_key=os.getenv("CAP_SECRET_KEY", "change-this-cap-secret"))
+
+class CapRedeemRequest(BaseModel):
+    token: str
+    solutions: list
+
+@app.get("/api/cap/challenge")
+async def create_cap_challenge():
+    return cap.create_challenge()
+
+@app.post("/api/cap/redeem")
+async def redeem_cap_challenge(request: CapRedeemRequest):
+    result = cap.redeem(request.token, request.solutions)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail="人机验证失败")
+    return result
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 VERIFICATION_CODE_EXPIRE_MINUTES = 10
@@ -123,9 +142,12 @@ async def register(
     password: str = Form(...),
     email: str = Form(...),
     verification_code: str = Form(...),
+    cap_token: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     email = _normalize_email(email)
+    if not cap.validate(cap_token):
+        raise HTTPException(status_code=400, detail="人机验证失败")
     existing_user = await db.execute(select(User).where(User.username == username))
     if existing_user.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="用户名已存在")
@@ -165,7 +187,9 @@ async def register(
 from fastapi.responses import JSONResponse
 
 @app.post("/api/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), cap_token: str = Form(...), db: AsyncSession = Depends(get_db)):
+    if not cap.validate(cap_token):
+        raise HTTPException(status_code=400, detail="人机验证失败")
     result = await db.execute(
         select(User).where(User.username == form_data.username)
     )
