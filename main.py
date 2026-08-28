@@ -34,7 +34,7 @@ class CapRedeemRequest(BaseModel):
     token: str
     solutions: list
 
-@app.get("/api/cap/challenge")
+@app.get("/api/cap/challenge", methods=["GET", "POST"])
 async def create_cap_challenge():
     return cap.create_challenge()
 
