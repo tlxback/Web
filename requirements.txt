@@ -7,3 +7,4 @@ pyjwt[crypto]==2.13.0
 python-multipart==0.0.32
 pydantic-settings==2.15.0
 capjs-server==0.2.0
+Pillow>=10.0
