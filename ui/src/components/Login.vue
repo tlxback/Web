@@ -50,6 +50,7 @@
 
         <p class="text-center mt-3">
           <RouterLink to="/register" class="me-2">去注册</RouterLink>
+          <RouterLink to="/forgot-password" class="me-2">忘记密码</RouterLink>
           <RouterLink to="/about">关于</RouterLink>
         </p>
       </div>

@@ -67,7 +67,7 @@ def _send_verification_email(email: str, code: str, subject: str = "注册验证
     message["Subject"] = subject
     message["From"] = smtp_user
     message["To"] = email
-    message.set_content(f"你的注册验证码是：{code}\n验证码有效期为 {VERIFICATION_CODE_EXPIRE_MINUTES} 分钟。")
+    message.set_content(f"你的{subject}是：{code}\n验证码有效期为 {VERIFICATION_CODE_EXPIRE_MINUTES} 分钟。")
 
     with smtplib.SMTP_SSL(
         os.getenv("SMTP_HOST", "smtp.sina.com"),
@@ -162,6 +162,87 @@ async def send_login_code(email: str = Form(...), db: AsyncSession = Depends(get
         await db.commit()
         raise HTTPException(status_code=503, detail="验证码邮件发送失败，请稍后重试") from exc
     return {"status": True, "msg": "登录验证码已发送"}
+
+@app.post("/api/public/send-password-reset-code")
+async def send_password_reset_code(
+    email: str = Form(...),
+    cap_token: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if not cap.validate(cap_token):
+        raise HTTPException(status_code=400, detail="人机验证失败")
+
+    email = _normalize_email(email)
+    result = await db.execute(select(User).where(User.email == email))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=400, detail="邮箱未注册")
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    await db.execute(delete(EmailVerificationCode).where(
+        EmailVerificationCode.email == email,
+        EmailVerificationCode.used.is_(False),
+    ))
+    verification = EmailVerificationCode(
+        email=email,
+        code_hash=_hash_verification_code(email, code),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_CODE_EXPIRE_MINUTES),
+    )
+    db.add(verification)
+    await db.commit()
+    try:
+        await asyncio.to_thread(_send_verification_email, email, code, "密码重置验证码")
+    except Exception as exc:
+        await db.delete(verification)
+        await db.commit()
+        raise HTTPException(status_code=503, detail="验证码邮件发送失败，请稍后重试") from exc
+    return {"status": True, "msg": "密码重置验证码已发送"}
+
+@app.post("/api/public/reset-password")
+async def reset_password(
+    email: str = Form(...),
+    verification_code: str = Form(...),
+    new_password: str = Form(...),
+    cap_token: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if not cap.validate(cap_token):
+        raise HTTPException(status_code=400, detail="人机验证失败")
+    if not new_password:
+        raise HTTPException(status_code=400, detail="新密码不能为空")
+
+    email = _normalize_email(email)
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=400, detail="邮箱未注册")
+
+    verification_result = await db.execute(
+        select(EmailVerificationCode)
+        .where(
+            EmailVerificationCode.email == email,
+            EmailVerificationCode.used.is_(False),
+        )
+        .order_by(EmailVerificationCode.created_at.desc())
+    )
+    verification = verification_result.scalars().first()
+    if (
+        verification is None
+        or verification.expires_at < datetime.now(timezone.utc)
+        or not hmac.compare_digest(
+            verification.code_hash,
+            _hash_verification_code(email, verification_code.strip()),
+        )
+    ):
+        raise HTTPException(status_code=400, detail="验证码无效或已过期")
+
+    verification.used = True
+    if user.exist and user.hashed_token:
+        db.add(RevokedToken(token_hash=user.hashed_token))
+    user.exist = False
+    user.hashed_token = None
+    user.hashed_password = pwd_context.hash(new_password)
+    await db.commit()
+    return {"status": True, "msg": "密码重置成功"}
 
 @app.post("/api/public/register")
 async def register(
