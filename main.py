@@ -34,7 +34,7 @@ class CapRedeemRequest(BaseModel):
     token: str
     solutions: list
 
-@app.get("/api/cap/challenge", methods=["GET", "POST"])
+@app.post("/api/cap/challenge")
 async def create_cap_challenge():
     return cap.create_challenge()
 
@@ -57,14 +57,14 @@ def _hash_verification_code(email: str, code: str) -> str:
         secret.encode(), f"{email}:{code}".encode(), hashlib.sha256
     ).hexdigest()
 
-def _send_verification_email(email: str, code: str) -> None:
+def _send_verification_email(email: str, code: str, subject: str = "注册验证码") -> None:
     smtp_user = os.getenv("SMTP_USER", "tlxback@sina.com")
     smtp_password = os.getenv("SMTP_PASSWORD")
     if not smtp_user or not smtp_password:
         raise RuntimeError("SMTP_USER 和 SMTP_PASSWORD 未配置")
 
     message = EmailMessage()
-    message["Subject"] = "注册验证码"
+    message["Subject"] = subject
     message["From"] = smtp_user
     message["To"] = email
     message.set_content(f"你的注册验证码是：{code}\n验证码有效期为 {VERIFICATION_CODE_EXPIRE_MINUTES} 分钟。")
@@ -136,6 +136,33 @@ async def send_verification_code(email: str = Form(...), db: AsyncSession = Depe
 
     return {"status": True, "msg": "验证码已发送"}
 
+@app.post("/api/public/send-login-code")
+async def send_login_code(email: str = Form(...), db: AsyncSession = Depends(get_db)):
+    email = _normalize_email(email)
+    result = await db.execute(select(User).where(User.email == email))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=400, detail="邮箱未注册")
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    await db.execute(delete(EmailVerificationCode).where(
+        EmailVerificationCode.email == email,
+        EmailVerificationCode.used.is_(False),
+    ))
+    verification = EmailVerificationCode(
+        email=email,
+        code_hash=_hash_verification_code(email, code),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_CODE_EXPIRE_MINUTES),
+    )
+    db.add(verification)
+    await db.commit()
+    try:
+        await asyncio.to_thread(_send_verification_email, email, code, "登录验证码")
+    except Exception as exc:
+        await db.delete(verification)
+        await db.commit()
+        raise HTTPException(status_code=503, detail="验证码邮件发送失败，请稍后重试") from exc
+    return {"status": True, "msg": "登录验证码已发送"}
+
 @app.post("/api/public/register")
 async def register(
     username: str = Form(...),
@@ -185,6 +212,43 @@ async def register(
     return {"status": True, "msg": "注册成功", "user_id": new_user.id}
 
 from fastapi.responses import JSONResponse
+
+@app.post("/api/login/code")
+async def login_by_code(
+    email: str = Form(...),
+    verification_code: str = Form(...),
+    cap_token: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if not cap.validate(cap_token):
+        raise HTTPException(status_code=400, detail="人机验证失败")
+    email = _normalize_email(email)
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=401, detail="邮箱未注册")
+    verification_result = await db.execute(
+        select(EmailVerificationCode)
+        .where(EmailVerificationCode.email == email, EmailVerificationCode.used.is_(False))
+        .order_by(EmailVerificationCode.created_at.desc())
+    )
+    verification = verification_result.scalars().first()
+    if (verification is None or verification.expires_at < datetime.now(timezone.utc)
+            or not hmac.compare_digest(
+                verification.code_hash,
+                _hash_verification_code(email, verification_code.strip()),
+            )):
+        raise HTTPException(status_code=400, detail="验证码无效或已过期")
+    verification.used = True
+    if user.exist and user.hashed_token:
+        db.add(RevokedToken(token_hash=user.hashed_token))
+    user.exist = True
+    access_token = create_access_token(data={"sub": user.username})
+    user.hashed_token = hashlib.sha256(access_token.encode()).hexdigest()
+    await db.commit()
+    response = JSONResponse(content={"access_token": access_token, "token_type": "bearer"})
+    response.set_cookie(key="access_token", value=access_token, httponly=False, samesite="lax")
+    return response
 
 @app.post("/api/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), cap_token: str = Form(...), db: AsyncSession = Depends(get_db)):
